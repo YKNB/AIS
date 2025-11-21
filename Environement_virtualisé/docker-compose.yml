@@ -1,0 +1,156 @@
+version: '3'
+
+networks:
+  my-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  openldap_data:
+    driver: local
+  collab-data:
+    driver: local
+  rh-data:
+    driver: local
+  it-data:
+    driver: local
+
+services:
+  mysql:
+    image: mysql:5.7
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: keycloak
+      MYSQL_USER: keycloak
+      MYSQL_PASSWORD: password
+    networks:
+      - my-network
+
+  openldap:
+    image: bitnami/openldap:2
+    ports:
+      - '1389:1389'
+      - '1636:1636'
+    environment:
+      - LDAP_ADMIN_USERNAME=admin
+      - LDAP_ADMIN_PASSWORD=adminpassword
+      - LDAP_USERS=user01,user02,user03
+      - LDAP_PASSWORDS=password1,password2,password3
+    networks:
+      - my-network
+    volumes:
+      - 'openldap_data:/bitnami/openldap'
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:legacy
+    environment:
+      DB_VENDOR: MYSQL
+      DB_ADDR: mysql
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_PASSWORD: password
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: Pa55w0rd
+      KEYCLOAK_LDAP_URL: ldap://openldap:1389
+      KEYCLOAK_LDAP_BIND_DN: cn=admin,dc=example,dc=org
+      KEYCLOAK_LDAP_BIND_CREDENTIALS: adminpassword
+      KEYCLOAK_LDAP_USER_DN_SUFFIX: ou=users,dc=example,dc=org
+      KEYCLOAK_LDAP_USER_OBJECT_CLASSES: inetOrgPerson
+      KEYCLOAK_LDAP_USER_ATTRIBUTE: uid
+    ports:
+      - 8095:8080
+    depends_on:
+      - openldap
+    networks:
+      - my-network
+
+  collab-container:
+    image: oceanet/co
+    container_name: workstationOceanet-collab
+    ports:
+      - 8099:80
+    volumes:
+      - collab-data:/app/data
+    depends_on:
+      - keycloak
+    networks:
+      - my-network
+    environment:
+      - USERNAME_USER03=user03
+      - PASSWORD_USER03=password3
+
+  it-container:
+    image: oceanet/it
+    container_name: workstationOceanet-it
+    ports:
+      - 3000:3000
+    volumes:
+      - it-data:/app/data
+    depends_on:
+      - keycloak
+    networks:
+      - my-network
+    environment:
+      - USERNAME_USER02=user02
+      - PASSWORD_USER02=password2
+      - DONT_PROMPT_WSL_INSTALL=1
+
+  rh-container:
+    image: oceanet/rh
+    container_name: workstationOceanet-rh
+    ports:
+      - 3308:3306
+    volumes:
+      - rh-data:/app/data
+    depends_on:
+      - keycloak
+    networks:
+      - my-network
+    environment:
+      - USERNAME_USER01=user01
+      - PASSWORD_USER01=password1
+      - MYSQL_PASSWORD=password
+
+  mariadb-galera:
+    image: bitnami/mariadb-galera:latest
+    environment:
+      - MARIADB_ROOT_PASSWORD=root-password
+      - MARIADB_GALERA_MARIABACKUP_PASSWORD=backup-password
+      - MARIADB_USER=customuser
+      - MARIADB_DATABASE=customdatabase
+      - MARIADB_ENABLE_LDAP=yes
+      - LDAP_URI=ldap://openldap:1389
+      - LDAP_BASE=dc=example,dc=org
+      - LDAP_BIND_DN=cn=admin,dc=example,dc=org
+      - LDAP_BIND_PASSWORD=adminpassword
+    networks:
+      - my-network
+    depends_on:
+      - openldap
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    ports:
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - my-network
+
+  traefik:
+    image: traefik:latest
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - 80:80
+      - 8185:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - my-network

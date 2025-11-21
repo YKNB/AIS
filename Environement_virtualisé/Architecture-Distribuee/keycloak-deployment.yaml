@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\ProgramData\chocolatey\lib\kubernetes-kompose\tools\kompose.exe convert
+    kompose.version: 1.28.0 (c4137012e)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: keycloak
+  name: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: keycloak
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\ProgramData\chocolatey\lib\kubernetes-kompose\tools\kompose.exe convert
+        kompose.version: 1.28.0 (c4137012e)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/environement-virtualis-my-network: "true"
+        io.kompose.service: keycloak
+    spec:
+      containers:
+        - env:
+            - name: DB_ADDR
+              value: mysql
+            - name: DB_DATABASE
+              value: keycloak
+            - name: DB_PASSWORD
+              value: password
+            - name: DB_USER
+              value: keycloak
+            - name: DB_VENDOR
+              value: MYSQL
+            - name: KEYCLOAK_LDAP_BIND_CREDENTIALS
+              value: adminpassword
+            - name: KEYCLOAK_LDAP_BIND_DN
+              value: cn=admin,dc=example,dc=org
+            - name: KEYCLOAK_LDAP_URL
+              value: ldap://openldap:1389
+            - name: KEYCLOAK_LDAP_USER_ATTRIBUTE
+              value: uid
+            - name: KEYCLOAK_LDAP_USER_DN_SUFFIX
+              value: ou=users,dc=example,dc=org
+            - name: KEYCLOAK_LDAP_USER_OBJECT_CLASSES
+              value: inetOrgPerson
+            - name: KEYCLOAK_PASSWORD
+              value: Pa55w0rd
+            - name: KEYCLOAK_USER
+              value: admin
+          image: quay.io/keycloak/keycloak:legacy
+          name: keycloak
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+status: {}
